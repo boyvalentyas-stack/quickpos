@@ -1,3 +1,17 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@media print {
+  body * { visibility: hidden; }
+  #receipt-print, #receipt-print * { visibility: visible; }
+  #receipt-print {
+    position: absolute;
+    left: 0; top: 0;
+    width: 58mm;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    color: black;
+  }
+  .no-print { display: none !important; }
+}

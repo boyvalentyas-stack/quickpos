@@ -7,6 +7,7 @@ import Dashboard from './pages/Dashboard'
 import Products from './pages/Products'
 import POS from './pages/POS'
 import Orders from './pages/Orders'
+import Settings from './pages/Settings'
 
 function ProtectedRoute({ children }) {
   const [session, setSession] = useState(undefined)
@@ -39,6 +40,7 @@ export default function App() {
         <Route path="/products"  element={<ProtectedRoute><Products /></ProtectedRoute>} />
         <Route path="/orders"    element={<ProtectedRoute><Orders /></ProtectedRoute>} />
         <Route path="*"          element={<Navigate to="/login" replace />} />
+        <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
       </Routes>
     </HashRouter>
   )

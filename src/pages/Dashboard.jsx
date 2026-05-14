@@ -107,6 +107,7 @@ export default function Dashboard() {
         <div className="mt-6 flex gap-3">
           <Link to="/products" className="bg-gray-800 hover:bg-gray-700 px-5 py-3 rounded-xl text-sm font-bold transition-colors">📦 Manage Products</Link>
           <Link to="/orders" className="bg-gray-800 hover:bg-gray-700 px-5 py-3 rounded-xl text-sm font-bold transition-colors">🧾 Order History</Link>
+          <Link to="/settings" className="bg-gray-800 hover:bg-gray-700 px-5 py-3 rounded-xl text-sm font-bold transition-colors">⚙️ Settings</Link>
         </div>
       </div>
     </div>
