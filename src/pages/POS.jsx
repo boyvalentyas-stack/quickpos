@@ -157,7 +157,7 @@ export default function POS() {
                 <div className={`text-xs mt-1 ${
                   p.stock === 0 ? 'text-red-400' : p.stock <= 5 ? 'text-amber-400' : 'text-gray-500'
                 }`}>
-                  {p.stock === 0 ? 'Habis' : p.stock <= 5 ? `Sisa ${p.stock}` : `${p.stock} tersedia`}
+                  {p.stock === 0 ? 'Out of stock' : p.stock <= 5 ? `Left ${p.stock}` : `${p.stock} in stock`}
                 </div>
               </button>
             ))}
