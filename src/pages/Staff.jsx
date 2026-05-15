@@ -53,7 +53,7 @@ export default function Staff() {
     // to create the auth user, then inserts the profile
     const { data: { session } } = await supabase.auth.getSession()
 
-    const res = await fetch('`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/invite-cashier`', {
+    const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/invite-cashier`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
