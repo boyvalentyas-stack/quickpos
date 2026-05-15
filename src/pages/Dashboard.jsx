@@ -67,9 +67,9 @@ export default function Dashboard() {
 
         <div className="grid grid-cols-3 gap-4 mb-8">
           {[
-            { label: 'Revenue Today', value: '$' + stats.revenue, color: 'text-violet-400' },
+            { label: 'Revenue Today', value: 'Rp.' + stats.revenue, color: 'text-violet-400' },
             { label: 'Orders', value: stats.orders, color: 'text-white' },
-            { label: 'Avg Order', value: '$' + stats.avg, color: 'text-green-400' },
+            { label: 'Avg Order', value: 'Rp.' + stats.avg, color: 'text-green-400' },
           ].map(s => (
             <div key={s.label} className="bg-gray-900 border border-gray-800 rounded-xl p-5">
               <div className="text-xs text-gray-400 uppercase tracking-widest mb-2">{s.label}</div>
