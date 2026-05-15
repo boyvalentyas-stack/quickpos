@@ -3,35 +3,54 @@ import { supabase } from '../lib/supabase'
 import { Link } from 'react-router-dom'
 
 export default function Settings() {
-  const [storeId, setStoreId] = useState(null)
-  const [store, setStore] = useState({
+  const [storeId,  setStoreId]  = useState(null)
+  const [myRole,   setMyRole]   = useState(null)
+  const [store,    setStore]    = useState({
     name: '', address: '', phone: '', instagram: '', receipt_footer: ''
   })
-  const [saving, setSaving] = useState(false)
-  const [saveMsg, setSaveMsg] = useState('')
+  const [saving,   setSaving]   = useState(false)
+  const [saveMsg,  setSaveMsg]  = useState('')
 
-  const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' })
-  const [pwMsg, setPwMsg] = useState('')
-  const [pwError, setPwError] = useState('')
-  const [pwLoading, setPwLoading] = useState(false)
+  const [pwForm,   setPwForm]   = useState({ current: '', next: '', confirm: '' })
+  const [pwMsg,    setPwMsg]    = useState('')
+  const [pwError,  setPwError]  = useState('')
+  const [pwLoading,setPwLoading]= useState(false)
 
   useEffect(() => {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       const { data: prof } = await supabase
-        .from('users').select('store_id, stores(*)').eq('id', user.id).single()
+        .from('users').select('store_id, role, stores(*)')
+        .eq('id', user.id).single()
+
       setStoreId(prof.store_id)
+      setMyRole(prof.role)
+
       const s = prof.stores
       setStore({
-        name:            s.name            || '',
-        address:         s.address         || '',
-        phone:           s.phone           || '',
-        instagram:       s.instagram       || '',
-        receipt_footer:  s.receipt_footer  || '',
+        name:           s?.name           || '',
+        address:        s?.address        || '',
+        phone:          s?.phone          || '',
+        instagram:      s?.instagram      || '',
+        receipt_footer: s?.receipt_footer || '',
       })
     }
     load()
   }, [])
+
+  // Cashiers cannot access this page
+  if (myRole && myRole !== 'owner') {
+    return (
+      <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-4xl mb-3">🔒</div>
+          <div className="text-lg font-bold mb-1">Access Restricted</div>
+          <p className="text-gray-400 text-sm mb-4">Only the store owner can access Settings.</p>
+          <Link to="/dashboard" className="text-violet-400 hover:underline text-sm">← Back to Dashboard</Link>
+        </div>
+      </div>
+    )
+  }
 
   async function saveStore(e) {
     e.preventDefault()
@@ -49,6 +68,7 @@ export default function Settings() {
       .eq('id', storeId)
     setSaveMsg(error ? '❌ ' + error.message : '✅ Store details saved!')
     setSaving(false)
+    setTimeout(() => setSaveMsg(''), 3000)
   }
 
   async function changePassword(e) {
@@ -61,16 +81,16 @@ export default function Settings() {
       return
     }
     if (pwForm.next.length < 6) {
-      setPwError('Password must be at least 6 characters.')
+      setPwError('New password must be at least 6 characters.')
       return
     }
 
     setPwLoading(true)
 
-    // Verify current password by attempting a sign-in
+    // Verify current password
     const { data: { user } } = await supabase.auth.getUser()
     const { error: signInErr } = await supabase.auth.signInWithPassword({
-      email: user.email,
+      email:    user.email,
       password: pwForm.current,
     })
 
@@ -80,10 +100,7 @@ export default function Settings() {
       return
     }
 
-    // Update to new password
-    const { error: updateErr } = await supabase.auth.updateUser({
-      password: pwForm.next
-    })
+    const { error: updateErr } = await supabase.auth.updateUser({ password: pwForm.next })
 
     if (updateErr) {
       setPwError('❌ ' + updateErr.message)
@@ -106,20 +123,19 @@ export default function Settings() {
         {/* Store Details */}
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
           <h2 className="font-bold text-lg mb-1">🏪 Store Details</h2>
-          <p className="text-gray-400 text-sm mb-5">This information will appear on every printed receipt.</p>
+          <p className="text-gray-400 text-sm mb-5">This information appears on every printed receipt.</p>
           <form onSubmit={saveStore} className="space-y-4">
             {[
-              { label: 'Store Name',        field: 'name',            placeholder: 'Sunrise Café',           type: 'text' },
-              { label: 'Address',           field: 'address',         placeholder: 'Jl. Sudirman No.1, Jakarta', type: 'text' },
-              { label: 'Phone Number',      field: 'phone',           placeholder: '0812-3456-7890',         type: 'text' },
-              { label: 'Instagram',         field: 'instagram',       placeholder: '@sunrisecafe',           type: 'text' },
-              { label: 'Receipt Footer',    field: 'receipt_footer',  placeholder: 'Terima kasih sudah berkunjung!', type: 'text' },
-            ].map(({ label, field, placeholder, type }) => (
+              { label: 'Store Name',      field: 'name',           placeholder: 'Sunrise Café' },
+              { label: 'Address',         field: 'address',        placeholder: 'Jl. Sudirman No.1, Jakarta' },
+              { label: 'Phone Number',    field: 'phone',          placeholder: '0812-3456-7890' },
+              { label: 'Instagram',       field: 'instagram',      placeholder: '@sunrisecafe' },
+              { label: 'Receipt Footer',  field: 'receipt_footer', placeholder: 'Terima kasih sudah berkunjung!' },
+            ].map(({ label, field, placeholder }) => (
               <div key={field}>
                 <label className="block text-xs text-gray-400 uppercase tracking-widest mb-1.5">{label}</label>
                 <input
-                  type={type}
-                  placeholder={placeholder}
+                  type="text" placeholder={placeholder}
                   value={store[field]}
                   onChange={e => setStore(s => ({ ...s, [field]: e.target.value }))}
                   className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-violet-500 transition-colors"
@@ -138,23 +154,22 @@ export default function Settings() {
           </form>
         </div>
 
-        {/* Change Password */}
+        {/* Change Password — owner only */}
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
           <h2 className="font-bold text-lg mb-1">🔒 Change Password</h2>
           <p className="text-gray-400 text-sm mb-5">
-            Change your account password. You'll need to enter your current password first.
+            Change your owner account password. Cashier passwords can only be reset by you from the Staff page.
           </p>
           <form onSubmit={changePassword} className="space-y-4">
             {[
-              { label: 'Current Password', field: 'current', placeholder: 'Your current password' },
-              { label: 'New Password',     field: 'next',    placeholder: 'At least 6 characters' },
+              { label: 'Current Password',     field: 'current', placeholder: 'Your current password' },
+              { label: 'New Password',         field: 'next',    placeholder: 'At least 6 characters' },
               { label: 'Confirm New Password', field: 'confirm', placeholder: 'Type new password again' },
             ].map(({ label, field, placeholder }) => (
               <div key={field}>
                 <label className="block text-xs text-gray-400 uppercase tracking-widest mb-1.5">{label}</label>
                 <input
-                  type="password"
-                  placeholder={placeholder}
+                  type="password" placeholder={placeholder}
                   value={pwForm[field]}
                   onChange={e => setPwForm(f => ({ ...f, [field]: e.target.value }))}
                   className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-violet-500 transition-colors"
