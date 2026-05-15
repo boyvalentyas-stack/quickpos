@@ -37,7 +37,7 @@ export default function Orders() {
                   <td className="px-4 py-3 text-sm font-bold text-violet-400">#{o.order_number}</td>
                   <td className="px-4 py-3 text-sm text-gray-400">{new Date(o.created_at).toLocaleString()}</td>
                   <td className="px-4 py-3 text-sm">{o.order_items?.length ?? 0} items</td>
-                  <td className="px-4 py-3 text-sm font-bold">${o.total.toFixed(2)}</td>
+                  <td className="px-4 py-3 text-sm font-bold">Rp. {o.total.toFixed(2)}</td>
                   <td className="px-4 py-3 text-sm text-gray-400">{o.payment_method}</td>
                   <td className="px-4 py-3 text-sm">
                     <span className={`px-2 py-0.5 rounded-md text-xs font-bold ${o.status==='completed' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>{o.status}</span>
