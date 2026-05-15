@@ -215,7 +215,7 @@ export default function Staff() {
                   <div className="text-xs text-gray-400 mt-0.5">{member.email}</div>
                 </div>
 
-                {/* Actions — only for non-owner, non-self */}
+                {/* Actions — only for Non-Owner, Non-Self */}
                 {member.role !== 'owner' && !isMe && (
                   <div>
                     {member.is_active ? (
