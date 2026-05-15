@@ -60,7 +60,7 @@ export default function Products() {
             {[
               { label:'Product Name', field:'name', type:'text', required:true },
               { label:'Emoji Icon', field:'emoji', type:'text' },
-              { label:'Price ($)', field:'price', type:'number', required:true },
+              { label:'Price (Rp. )', field:'price', type:'number', required:true },
               { label:'Stock Quantity', field:'stock', type:'number', required:true },
               { label:'SKU / Barcode', field:'sku', type:'text' },
             ].map(({ label, field, type, required }) => (
@@ -102,7 +102,7 @@ export default function Products() {
                 <tr key={p.id} className="border-b border-gray-800 last:border-0 hover:bg-gray-800/50">
                   <td className="px-4 py-3 text-sm font-medium">{p.emoji} {p.name}</td>
                   <td className="px-4 py-3 text-sm text-gray-400">{p.categories?.name || '—'}</td>
-                  <td className="px-4 py-3 text-sm font-bold">${p.price.toFixed(2)}</td>
+                  <td className="px-4 py-3 text-sm font-bold">Rp. {p.price.toFixed(2)}</td>
                   <td className="px-4 py-3 text-sm">
                     <span className={`px-2 py-0.5 rounded-md text-xs font-bold ${p.stock === 0 ? 'bg-red-500/20 text-red-400' : p.stock <= p.low_stock_threshold ? 'bg-amber-500/20 text-amber-400' : 'bg-green-500/20 text-green-400'}`}>
                       {p.stock === 0 ? 'Out of stock' : p.stock + ' units'}

@@ -138,7 +138,7 @@ export default function POS() {
         <div className="flex-1 flex flex-col overflow-hidden p-4">
           <input
             type="text"
-            placeholder="🔍 Cari produk atau scan barcode..."
+            placeholder="🔍 Find product or scan barcode..."
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-violet-500 mb-4"
@@ -167,13 +167,13 @@ export default function POS() {
         {/* Cart panel */}
         <div className="w-80 bg-gray-900 border-l border-gray-800 flex flex-col">
           <div className="px-4 py-3 border-b border-gray-800 flex justify-between items-center">
-            <span className="font-bold">Keranjang ({cart.reduce((s, i) => s + i.qty, 0)} item)</span>
-            <button onClick={() => setCart([])} className="text-xs text-gray-400 hover:text-white">Kosongkan</button>
+            <span className="font-bold">Open Bill ({cart.reduce((s, i) => s + i.qty, 0)} item)</span>
+            <button onClick={() => setCart([])} className="text-xs text-gray-400 hover:text-white">Empty Bill</button>
           </div>
 
           <div className="flex-1 overflow-y-auto px-3 py-2">
             {cart.length === 0 && (
-              <div className="text-center text-gray-500 py-12 text-sm">Ketuk produk untuk menambahkan</div>
+              <div className="text-center text-gray-500 py-12 text-sm">Tap to add</div>
             )}
             {cart.map(item => (
               <div key={item.id} className="flex items-center gap-2 py-2 border-b border-gray-800">
@@ -201,7 +201,7 @@ export default function POS() {
             </div>
             <input
               type="number"
-              placeholder="Uang diterima (Rp)"
+              placeholder="Cash Received (Rp)"
               value={cash}
               onChange={e => setCash(e.target.value)}
               className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-violet-500 text-lg font-bold"
@@ -216,7 +216,7 @@ export default function POS() {
               onClick={completeSale}
               disabled={cart.length === 0 || cashNum < total || processing}
               className="w-full bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl transition-colors">
-              {processing ? 'Memproses...' : '✓ Selesaikan Transaksi'}
+              {processing ? 'Processing...' : '✓ Close Bill'}
             </button>
           </div>
         </div>
