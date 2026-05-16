@@ -367,23 +367,23 @@ export default function POS() {
                     ? 'border-gray-700 opacity-40 cursor-not-allowed'
                     : 'border-gray-700 hover:border-violet-500 active:scale-95'
                 }`}>
-                {p.image_url
-                  ? <img src={p.image_url} alt={p.name} className="w-full aspect-square object-cover" />
-                  : <div className="w-full aspect-square bg-gray-700 flex items-center justify-center text-3xl sm:text-4xl">{p.emoji}</div>
+                  {p.image_url
+                  ? <img src={p.image_url} alt={p.name} className="w-full aspect-video object-cover" />
+                  : <div className="w-full aspect-video bg-gray-700 flex items-center justify-center text-3xl sm:text-4xl">{p.emoji}</div>
                 }
                 <div className="p-2">
-                  <div className="text-xs sm:text-sm font-bold leading-tight mb-0.5 truncate">{p.name}</div>
-                  <div className="text-violet-400 font-bold text-xs sm:text-sm">{formatRp(p.price)}</div>
-                  <div className={`text-xs mt-0.5 ${
-                    p.stock === 0 ? 'text-red-400'
-                    : p.stock <= 5 ? 'text-amber-400'
-                    : 'text-gray-500'
-                  }`}>
-                    {p.stock === 0 ? t.outOfStock
-                      : p.stock <= 5 ? `${t.lowStock} ${p.stock} ${t.left}`
-                      : `${p.stock} ${t.available}`}
-                  </div>
+                <div className="text-xs sm:text-sm font-bold leading-tight mb-0.5 line-clamp-2 text-left">{p.name}</div>
+                <div className="text-violet-400 font-bold text-xs sm:text-sm text-left">{formatRp(p.price)}</div>
+                <div className={`text-xs mt-0.5 text-left ${
+                  p.stock === 0 ? 'text-red-400'
+                  : p.stock <= 5 ? 'text-amber-400'
+                  : 'text-gray-500'
+                }`}>
+                  {p.stock === 0 ? t.outOfStock
+                    : p.stock <= 5 ? `${t.lowStock} ${p.stock} ${t.left}`
+                    : `${p.stock} ${t.available}`}
                 </div>
+              </div>
               </button>
             ))}
             {filtered.length === 0 && (

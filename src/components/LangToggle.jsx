@@ -6,11 +6,11 @@ export default function LangToggle() {
     <button
       onClick={toggleLang}
       title={lang === 'en' ? 'Switch to Bahasa Indonesia' : 'Switch to English'}
-      className="flex items-center gap-1 bg-gray-800 hover:bg-gray-700 border border-gray-700 px-2.5 py-1.5 rounded-lg text-sm transition-colors select-none"
+      className="flex items-center gap-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors select-none"
     >
-      {lang === 'en' ? '🇬🇧' : '🇮🇩'}
-      <span className="text-gray-400">/</span>
-      {lang === 'en' ? '🇮🇩' : '🇬🇧'}
+      <span className="text-white">{lang === 'en' ? 'EN' : 'ID'}</span>
+      <span className="text-gray-500">|</span>
+      <span className="text-gray-400">{lang === 'en' ? 'ID' : 'EN'}</span>
     </button>
   )
 }
