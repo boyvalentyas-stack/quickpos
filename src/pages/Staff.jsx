@@ -182,8 +182,6 @@ export default function Staff() {
                   </div>
                   <div className="text-xs text-gray-400 mt-0.5 truncate">{member.email}</div>
                 </div>
-
-                {/* Actions — only for non-owner, non-self */}
                 {member.role !== 'owner' && !isMe && (
                   member.is_active
                     ? <button onClick={() => removeCashier(member.id, member.full_name)}
