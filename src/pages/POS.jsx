@@ -204,11 +204,20 @@ export default function POS() {
         </div>
 
         {payMethod === 'cash' && (
-          <>
-            <input type="number" placeholder={t.cashReceived} value={cash}
-              onChange={e => setCash(e.target.value)} disabled={limitHit}
-              className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-violet-500 font-bold text-base disabled:opacity-40"
-            />
+        <>
+          <input
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            placeholder={t.cashReceived}
+            value={cash}
+            onChange={e => {
+              const val = e.target.value.replace(/[^0-9]/g, '')
+              setCash(val)
+            }}
+            disabled={limitHit}
+            className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-violet-500 font-bold text-base disabled:opacity-40"
+          />
             {cashNum > 0 && (
               <div className={`flex justify-between font-bold ${change >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                 <span>{t.change}</span><span>{formatRp(change)}</span>
