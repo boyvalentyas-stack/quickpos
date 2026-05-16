@@ -211,9 +211,9 @@ export default function POS() {
             pattern="[0-9]*"
             placeholder={t.cashReceived}
             value={cash}
-            onChange={e => {
-              const val = e.target.value.replace(/[^0-9]/g, '')
-              setCash(val)
+            onChange={e => setCash(e.target.value)}
+              onKeyPress={e => {
+              if (!/[0-9]/.test(e.key)) e.preventDefault()
             }}
             disabled={limitHit}
             className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-violet-500 font-bold text-base disabled:opacity-40"
