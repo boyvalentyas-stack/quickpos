@@ -10,9 +10,6 @@ import Orders    from './pages/Orders'
 import Settings  from './pages/Settings'
 import Staff     from './pages/Staff'
 
-// ── Role-aware protected route ──────────────────────────────
-// ownerOnly=true  → redirects cashiers to /dashboard
-// ownerOnly=false → any logged-in user can access
 function ProtectedRoute({ children, ownerOnly = false }) {
   const [session,  setSession]  = useState(undefined)
   const [role,     setRole]     = useState(null)
@@ -23,18 +20,12 @@ function ProtectedRoute({ children, ownerOnly = false }) {
       setSession(data.session)
       if (data.session && ownerOnly) {
         const { data: prof } = await supabase
-          .from('users')
-          .select('role')
-          .eq('id', data.session.user.id)
-          .single()
+          .from('users').select('role').eq('id', data.session.user.id).single()
         setRole(prof?.role || 'cashier')
       }
       setChecking(false)
     })
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, s) => {
-      setSession(s)
-    })
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, s) => setSession(s))
     return () => subscription.unsubscribe()
   }, [])
 
@@ -48,7 +39,6 @@ function ProtectedRoute({ children, ownerOnly = false }) {
 
   if (!session) return <Navigate to="/login" replace />
   if (ownerOnly && role && role !== 'owner') return <Navigate to="/dashboard" replace />
-
   return children
 }
 
@@ -56,21 +46,15 @@ export default function App() {
   return (
     <HashRouter>
       <Routes>
-        {/* Public */}
-        <Route path="/login"  element={<Login />} />
-        <Route path="/signup" element={<Signup />} />
-
-        {/* Any authenticated user */}
+        <Route path="/login"     element={<Login />} />
+        <Route path="/signup"    element={<Signup />} />
         <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/pos"       element={<ProtectedRoute><POS /></ProtectedRoute>} />
         <Route path="/orders"    element={<ProtectedRoute><Orders /></ProtectedRoute>} />
-
-        {/* Owner only */}
         <Route path="/products"  element={<ProtectedRoute ownerOnly><Products /></ProtectedRoute>} />
         <Route path="/settings"  element={<ProtectedRoute ownerOnly><Settings /></ProtectedRoute>} />
         <Route path="/staff"     element={<ProtectedRoute ownerOnly><Staff /></ProtectedRoute>} />
-
-        <Route path="*" element={<Navigate to="/login" replace />} />
+        <Route path="*"          element={<Navigate to="/login" replace />} />
       </Routes>
     </HashRouter>
   )
