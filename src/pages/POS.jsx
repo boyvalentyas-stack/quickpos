@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { Link } from 'react-router-dom'
 import { useLang } from '../context/LanguageContext'
@@ -13,7 +13,8 @@ export default function POS() {
   const [products,   setProducts]   = useState([])
   const [cart,       setCart]       = useState([])
   const [search,     setSearch]     = useState('')
-  const [cash,       setCash]       = useState('')
+  const [cash, setCash] = useState('')
+  const cashInputRef = useRef(null)
   const [payMethod,  setPayMethod]  = useState('cash') // 'cash' | 'qris'
   const [profile,    setProfile]    = useState(null)
   const [receipt,    setReceipt]    = useState(null)
@@ -71,7 +72,7 @@ export default function POS() {
   }
 
   const total    = cart.reduce((s, i) => s + i.price * i.qty, 0)
-  const cashNum  = parseFloat(cash) || 0
+  const cashNum = cash === '' ? 0 : (parseInt(cash.replace(/\D/g, ''), 10) || 0)
   const change   = cashNum - total
   const itemCount = cart.reduce((s, i) => s + i.qty, 0)
 
@@ -138,6 +139,7 @@ export default function POS() {
       setReceipt({ order, cart: [...cart], total, cashNum, change, payMethod, store: profile.stores })
       setCart([])
       setCash('')
+      if (cashInputRef.current) cashInputRef.current.value = ''
       setShowCart(false)
     } catch (err) {
       setOrderError(err.message)
@@ -206,18 +208,21 @@ export default function POS() {
         {payMethod === 'cash' && (
         <>
           <input
-            type="text"
-            inputMode="numeric"
-            pattern="[0-9]*"
-            placeholder={t.cashReceived}
-            value={cash}
-            onChange={e => setCash(e.target.value)}
-              onKeyPress={e => {
-              if (!/[0-9]/.test(e.key)) e.preventDefault()
-            }}
-            disabled={limitHit}
-            className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-violet-500 font-bold text-base disabled:opacity-40"
-          />
+  ref={cashInputRef}
+  type="text"
+  inputMode="numeric"
+  placeholder={t.cashReceived}
+  defaultValue={cash}
+  onInput={e => {
+    const pos = e.target.selectionStart
+    const raw = e.target.value.replace(/\D/g, '')
+    e.target.value = raw
+    e.target.setSelectionRange(pos, pos)
+    setCash(raw)
+  }}
+  disabled={limitHit}
+  className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-violet-500 font-bold text-base disabled:opacity-40"
+/>
             {cashNum > 0 && (
               <div className={`flex justify-between font-bold ${change >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                 <span>{t.change}</span><span>{formatRp(change)}</span>
