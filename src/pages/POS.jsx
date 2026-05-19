@@ -107,26 +107,23 @@ function CartPanel({
           </>
         )}
 
-        {/* QRIS amount display */}
+        {/* QRIS display — compact */}
         {payMethod === 'qris' && cart.length > 0 && (
-          <div className="space-y-2">
-            <div className="bg-gray-800 rounded-xl p-3 text-center">
-              <div className="text-xs text-gray-400 mb-1">QRIS Amount</div>
-              <div className="text-violet-400 font-bold text-lg">{formatRp(total)}</div>
+          <div className="bg-gray-800 rounded-xl px-3 py-2.5 flex items-center justify-between gap-2">
+            <div>
+              <div className="text-xs text-gray-400">QRIS</div>
+              <div className="text-violet-400 font-bold">{formatRp(total)}</div>
             </div>
-            {qrisImageUrl && (
+            {qrisImageUrl ? (
               <button
                 type="button"
                 onClick={() => setShowQrisModal(true)}
-                className="w-full bg-violet-600/20 hover:bg-violet-600/30 border border-violet-500/40 text-violet-300 font-bold py-2.5 rounded-xl text-sm transition-colors flex items-center justify-center gap-2"
+                className="bg-violet-600 hover:bg-violet-500 text-white font-bold px-3 py-1.5 rounded-lg text-xs transition-colors whitespace-nowrap"
               >
-                📱 Show QRIS to Customer
+                📱 Show QR
               </button>
-            )}
-            {!qrisImageUrl && (
-              <p className="text-xs text-amber-400 text-center">
-                ⚠️ No QRIS image set. Add one in Settings.
-              </p>
+            ) : (
+              <span className="text-xs text-amber-400">No QR set</span>
             )}
           </div>
         )}
@@ -390,13 +387,13 @@ export default function POS() {
                     : 'border-gray-700 hover:border-violet-500 active:scale-95'
                 }`}>
                 {p.image_url
-                  ? <img src={p.image_url} alt={p.name} className="w-full aspect-square object-cover" />
-                  : <div className="w-full aspect-square bg-gray-700 flex items-center justify-center text-3xl sm:text-4xl">{p.emoji}</div>
+                  ? <img src={p.image_url} alt={p.name} className="w-full aspect-video object-cover" />
+                  : <div className="w-full h-20 bg-gray-700 flex items-center justify-center text-3xl">{p.emoji}</div>
                 }
                 <div className="p-2">
-                  <div className="text-xs sm:text-sm font-bold leading-tight mb-0.5 truncate">{p.name}</div>
-                  <div className="text-violet-400 font-bold text-xs sm:text-sm">{formatRp(p.price)}</div>
-                  <div className={`text-xs mt-0.5 ${
+                  <div className="text-xs font-bold leading-tight mb-0.5 line-clamp-2 text-left">{p.name}</div>
+                  <div className="text-violet-400 font-bold text-xs text-left">{formatRp(p.price)}</div>
+                  <div className={`text-xs mt-0.5 text-left ${
                     p.stock === 0 ? 'text-red-400'
                     : p.stock <= 5 ? 'text-amber-400'
                     : 'text-gray-500'
