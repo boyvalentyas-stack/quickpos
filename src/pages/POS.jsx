@@ -21,6 +21,7 @@ function CartPanel({
   payMethod, onSetPayMethod, limitHit, processing, orderError,
   onUpdateQty, onClearCart, onCompleteSale,
   cashInputRef, onCashInput,
+  qrisImageUrl, setShowQrisModal,
 }) {
   return (
     <div className="flex flex-col h-full">
@@ -108,9 +109,25 @@ function CartPanel({
 
         {/* QRIS amount display */}
         {payMethod === 'qris' && cart.length > 0 && (
-          <div className="bg-gray-800 rounded-xl p-3 text-center">
-            <div className="text-xs text-gray-400 mb-1">QRIS Amount</div>
-            <div className="text-violet-400 font-bold text-lg">{formatRp(total)}</div>
+          <div className="space-y-2">
+            <div className="bg-gray-800 rounded-xl p-3 text-center">
+              <div className="text-xs text-gray-400 mb-1">QRIS Amount</div>
+              <div className="text-violet-400 font-bold text-lg">{formatRp(total)}</div>
+            </div>
+            {qrisImageUrl && (
+              <button
+                type="button"
+                onClick={() => setShowQrisModal(true)}
+                className="w-full bg-violet-600/20 hover:bg-violet-600/30 border border-violet-500/40 text-violet-300 font-bold py-2.5 rounded-xl text-sm transition-colors flex items-center justify-center gap-2"
+              >
+                📱 Show QRIS to Customer
+              </button>
+            )}
+            {!qrisImageUrl && (
+              <p className="text-xs text-amber-400 text-center">
+                ⚠️ No QRIS image set. Add one in Settings.
+              </p>
+            )}
           </div>
         )}
 
@@ -145,7 +162,9 @@ export default function POS() {
   const [orderError, setOrderError] = useState('')
   const [todayCount, setTodayCount] = useState(0)
   const [plan,       setPlan]       = useState('free')
-  const [showCart,   setShowCart]   = useState(false)
+  const [showCart,     setShowCart]     = useState(false)
+  const [qrisImageUrl, setQrisImageUrl] = useState(null)
+  const [showQrisModal, setShowQrisModal] = useState(false)
 
   const cashInputRef = useRef(null)
   const DAY_LIMIT    = 100
@@ -158,6 +177,7 @@ export default function POS() {
         .from('users').select('*, stores(*)').eq('id', user.id).single()
       setProfile(prof)
       setPlan(prof.stores?.plan || 'free')
+      setQrisImageUrl(prof.stores?.qris_image_url || null)
       const { data: prods } = await supabase
         .from('products').select('*, categories(name)')
         .eq('store_id', prof.store_id).eq('is_active', true).order('name')
@@ -305,6 +325,8 @@ export default function POS() {
     onCompleteSale: completeSale,
     cashInputRef,
     onCashInput: handleCashInput,
+    qrisImageUrl,
+    setShowQrisModal,
   }
 
   return (
@@ -367,23 +389,23 @@ export default function POS() {
                     ? 'border-gray-700 opacity-40 cursor-not-allowed'
                     : 'border-gray-700 hover:border-violet-500 active:scale-95'
                 }`}>
-                  {p.image_url
-                  ? <img src={p.image_url} alt={p.name} className="w-full aspect-video object-cover" />
-                  : <div className="w-full aspect-video bg-gray-700 flex items-center justify-center text-3xl sm:text-4xl">{p.emoji}</div>
+                {p.image_url
+                  ? <img src={p.image_url} alt={p.name} className="w-full aspect-square object-cover" />
+                  : <div className="w-full aspect-square bg-gray-700 flex items-center justify-center text-3xl sm:text-4xl">{p.emoji}</div>
                 }
                 <div className="p-2">
-                <div className="text-xs sm:text-sm font-bold leading-tight mb-0.5 line-clamp-2 text-left">{p.name}</div>
-                <div className="text-violet-400 font-bold text-xs sm:text-sm text-left">{formatRp(p.price)}</div>
-                <div className={`text-xs mt-0.5 text-left ${
-                  p.stock === 0 ? 'text-red-400'
-                  : p.stock <= 5 ? 'text-amber-400'
-                  : 'text-gray-500'
-                }`}>
-                  {p.stock === 0 ? t.outOfStock
-                    : p.stock <= 5 ? `${t.lowStock} ${p.stock} ${t.left}`
-                    : `${p.stock} ${t.available}`}
+                  <div className="text-xs sm:text-sm font-bold leading-tight mb-0.5 truncate">{p.name}</div>
+                  <div className="text-violet-400 font-bold text-xs sm:text-sm">{formatRp(p.price)}</div>
+                  <div className={`text-xs mt-0.5 ${
+                    p.stock === 0 ? 'text-red-400'
+                    : p.stock <= 5 ? 'text-amber-400'
+                    : 'text-gray-500'
+                  }`}>
+                    {p.stock === 0 ? t.outOfStock
+                      : p.stock <= 5 ? `${t.lowStock} ${p.stock} ${t.left}`
+                      : `${p.stock} ${t.available}`}
+                  </div>
                 </div>
-              </div>
               </button>
             ))}
             {filtered.length === 0 && (
@@ -480,6 +502,37 @@ export default function POS() {
                 {t.print}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* QRIS fullscreen modal — shown to customer for scanning */}
+      {showQrisModal && qrisImageUrl && (
+        <div
+          className="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center p-6"
+          onClick={() => setShowQrisModal(false)}
+        >
+          <div className="text-center mb-6">
+            <div className="text-white font-bold text-xl mb-1">Scan to Pay</div>
+            <div className="text-violet-400 font-bold text-3xl">{formatRp(total)}</div>
+            <div className="text-gray-400 text-sm mt-1">via QRIS</div>
+          </div>
+          <div className="bg-white rounded-3xl p-4 shadow-2xl"
+            onClick={e => e.stopPropagation()}>
+            <img
+              src={qrisImageUrl}
+              alt="QRIS Code"
+              className="w-72 h-72 sm:w-96 sm:h-96 object-contain"
+            />
+          </div>
+          <div className="mt-6 text-center space-y-2">
+            <p className="text-gray-400 text-sm">Ask customer to scan using their e-wallet app</p>
+            <button
+              onClick={() => setShowQrisModal(false)}
+              className="bg-gray-800 hover:bg-gray-700 text-white px-8 py-3 rounded-xl font-bold text-sm transition-colors mt-2"
+            >
+              ✓ Done — Close
+            </button>
           </div>
         </div>
       )}

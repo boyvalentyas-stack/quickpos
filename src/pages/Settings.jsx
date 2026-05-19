@@ -4,369 +4,325 @@ import { Link } from 'react-router-dom'
 import { useLang } from '../context/LanguageContext'
 import LangToggle from '../components/LangToggle'
 
-const FREE_LIMIT = 30
-
-function processImage(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = e => {
-      const img = new Image()
-      img.onload = () => {
-        const canvas = document.createElement('canvas')
-        canvas.width = 400; canvas.height = 400
-        const size = Math.min(img.width, img.height)
-        const sx = (img.width - size) / 2, sy = (img.height - size) / 2
-        const ctx = canvas.getContext('2d')
-        ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, 400, 400)
-        ctx.drawImage(img, sx, sy, size, size, 0, 0, 400, 400)
-        let quality = 0.85
-        const tryEncode = () => canvas.toBlob(b => {
-          if (!b) { reject(new Error('Failed')); return }
-          if (b.size > 1_000_000 && quality > 0.3) { quality -= 0.1; tryEncode() }
-          else resolve(b)
-        }, 'image/jpeg', quality)
-        tryEncode()
-      }
-      img.onerror = () => reject(new Error('Invalid image'))
-      img.src = e.target.result
-    }
-    reader.onerror = () => reject(new Error('Read failed'))
-    reader.readAsDataURL(file)
-  })
-}
-
-const emptyForm = { name: '', price: '', stock: '', category_id: '', sku: '', emoji: '📦' }
-
-export default function Products() {
+export default function Settings() {
   const { t } = useLang()
-  const [products,   setProducts]   = useState([])
-  const [categories, setCategories] = useState([])
-  const [storeId,    setStoreId]    = useState(null)
-  const [plan,       setPlan]       = useState('free')
-  const [showForm,   setShowForm]   = useState(false)
-  const [editingId,  setEditingId]  = useState(null) // null = add mode, id = edit mode
-  const [form,       setForm]       = useState(emptyForm)
-  const [imageFile,  setImageFile]  = useState(null)
-  const [imagePreview, setImagePreview] = useState(null)
-  const [existingImageUrl, setExistingImageUrl] = useState(null)
-  const [imageLoading, setImageLoading] = useState(false)
-  const [saving,     setSaving]     = useState(false)
-  const [error,      setError]      = useState('')
-  const fileInputRef = useRef(null)
+  const [storeId,  setStoreId]  = useState(null)
+  const [myRole,   setMyRole]   = useState(null)
+  const [store,    setStore]    = useState({
+    name:'', address:'', phone:'', instagram:'', receipt_footer:'', store_code:'', qris_image_url:''
+  })
+  const [saving,   setSaving]   = useState(false)
+  const [saveMsg,  setSaveMsg]  = useState('')
+  const [pwForm,   setPwForm]   = useState({ current:'', next:'', confirm:'' })
+  const [pwMsg,    setPwMsg]    = useState('')
+  const [pwError,  setPwError]  = useState('')
+  const [pwLoad,   setPwLoad]   = useState(false)
 
-  const activeCount = products.filter(p => p.is_active).length
-  const atLimit     = plan === 'free' && activeCount >= FREE_LIMIT
+  // QRIS upload state
+  const [qrisFile,    setQrisFile]    = useState(null)
+  const [qrisPreview, setQrisPreview] = useState(null)
+  const [qrisLoading, setQrisLoading] = useState(false)
+  const [qrisMsg,     setQrisMsg]     = useState('')
+  const qrisInputRef = useRef(null)
 
-  useEffect(() => { loadAll() }, [])
+  useEffect(() => {
+    async function load() {
+      const { data: { user } } = await supabase.auth.getUser()
+      const { data: prof } = await supabase
+        .from('users').select('store_id, role, stores(*)').eq('id', user.id).single()
+      setStoreId(prof.store_id)
+      setMyRole(prof.role)
+      const s = prof.stores
+      setStore({
+        name:           s?.name           || '',
+        address:        s?.address        || '',
+        phone:          s?.phone          || '',
+        instagram:      s?.instagram      || '',
+        receipt_footer: s?.receipt_footer || '',
+        store_code:     s?.store_code     || '',
+        qris_image_url: s?.qris_image_url || '',
+      })
+    }
+    load()
+  }, [])
 
-  async function loadAll() {
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data: prof } = await supabase
-      .from('users').select('store_id, stores(plan)').eq('id', user.id).single()
-    setStoreId(prof.store_id)
-    setPlan(prof.stores?.plan || 'free')
-    const { data: prods } = await supabase.from('products')
-      .select('*, categories(name)').eq('store_id', prof.store_id)
-      .eq('is_active', true).order('name')
-    setProducts(prods || [])
-    const { data: cats } = await supabase.from('categories')
-      .select('*').eq('store_id', prof.store_id)
-    setCategories(cats || [])
+  if (myRole && myRole !== 'owner') {
+    return (
+      <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-4xl mb-3">🔒</div>
+          <div className="text-lg font-bold">{t.ownerOnly}</div>
+          <Link to="/dashboard" className="text-violet-400 text-sm hover:underline mt-2 block">{t.back}</Link>
+        </div>
+      </div>
+    )
   }
 
-  async function handleFileChange(e) {
+  async function saveStore(e) {
+    e.preventDefault()
+    setSaving(true); setSaveMsg('')
+    const { error } = await supabase.from('stores').update({
+      name: store.name, address: store.address, phone: store.phone,
+      instagram: store.instagram, receipt_footer: store.receipt_footer,
+    }).eq('id', storeId)
+    setSaveMsg(error ? '❌ ' + error.message : '✅ Store details saved!')
+    setSaving(false)
+    setTimeout(() => setSaveMsg(''), 3000)
+  }
+
+  async function changePassword(e) {
+    e.preventDefault()
+    setPwMsg(''); setPwError('')
+    if (pwForm.next !== pwForm.confirm) { setPwError('New passwords do not match.'); return }
+    if (pwForm.next.length < 6) { setPwError('Password must be at least 6 characters.'); return }
+    setPwLoad(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    const { error: signInErr } = await supabase.auth.signInWithPassword({ email: user.email, password: pwForm.current })
+    if (signInErr) { setPwError('Current password is incorrect.'); setPwLoad(false); return }
+    const { error: updateErr } = await supabase.auth.updateUser({ password: pwForm.next })
+    if (updateErr) setPwError('❌ ' + updateErr.message)
+    else { setPwMsg('✅ Password changed successfully!'); setPwForm({ current:'', next:'', confirm:'' }) }
+    setPwLoad(false)
+  }
+
+  // ── QRIS image upload ─────────────────────────────────────
+  async function handleQrisFile(e) {
     const file = e.target.files?.[0]
     if (!file) return
-    if (!file.type.startsWith('image/')) { setError('Please select an image file.'); return }
-    setImageLoading(true); setError('')
-    try {
-      const processed = await processImage(file)
-      setImageFile(processed)
-      const reader = new FileReader()
-      reader.onload = ev => setImagePreview(ev.target.result)
-      reader.readAsDataURL(processed)
-    } catch (err) { setError('Image processing failed: ' + err.message) }
-    setImageLoading(false)
+    if (!file.type.startsWith('image/')) { setQrisMsg('❌ Please select an image file.'); return }
+    setQrisFile(file)
+    const reader = new FileReader()
+    reader.onload = ev => setQrisPreview(ev.target.result)
+    reader.readAsDataURL(file)
     e.target.value = ''
   }
 
-  function openAddForm() {
-    setEditingId(null); setForm(emptyForm)
-    setImageFile(null); setImagePreview(null); setExistingImageUrl(null)
-    setError(''); setShowForm(true)
-  }
+  async function saveQris() {
+    if (!qrisFile) return
+    setQrisLoading(true); setQrisMsg('')
 
-  function openEditForm(p) {
-    setEditingId(p.id)
-    setForm({ name: p.name, price: p.price, stock: p.stock, category_id: p.category_id || '', sku: p.sku || '', emoji: p.emoji || '📦' })
-    setImageFile(null)
-    setImagePreview(null)
-    setExistingImageUrl(p.image_url || null)
-    setError(''); setShowForm(true)
-  }
+    const fileName = `${storeId}/qris.${qrisFile.name.split('.').pop()}`
 
-  function closeForm() {
-    setShowForm(false); setEditingId(null); setError('')
-    setImageFile(null); setImagePreview(null); setExistingImageUrl(null)
-  }
-
-  async function saveProduct(e) {
-    e.preventDefault()
-    if (!editingId && atLimit) return
-    setSaving(true); setError('')
-
-    let image_url = existingImageUrl // keep existing by default
-
-    if (imageFile) {
-      // Upload new image
-      const fileName = `${storeId}/${Date.now()}.jpg`
-      const { error: upErr } = await supabase.storage
-        .from('product-images').upload(fileName, imageFile, { contentType: 'image/jpeg' })
-      if (upErr) { setError('Image upload failed: ' + upErr.message); setSaving(false); return }
-      const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(fileName)
-      image_url = urlData.publicUrl
-
-      // Delete old image from storage if replacing
-      if (existingImageUrl) {
-        const oldPath = existingImageUrl.split('/product-images/')[1]
-        if (oldPath) await supabase.storage.from('product-images').remove([oldPath])
-      }
+    // Delete old file first if exists
+    if (store.qris_image_url) {
+      const oldPath = store.qris_image_url.split('/qris-images/')[1]
+      if (oldPath) await supabase.storage.from('qris-images').remove([oldPath])
     }
 
-    const payload = {
-      name:        form.name,
-      price:       parseFloat(form.price),
-      stock:       parseInt(form.stock),
-      category_id: form.category_id || null,
-      sku:         form.sku || null,
-      emoji:       form.emoji || '📦',
-      image_url,
-    }
+    const { error: upErr } = await supabase.storage
+      .from('qris-images')
+      .upload(fileName, qrisFile, { contentType: qrisFile.type, upsert: true })
 
-    if (editingId) {
-      // UPDATE
-      const { data, error: dbErr } = await supabase.from('products')
-        .update(payload).eq('id', editingId).select('*, categories(name)').single()
-      if (dbErr) { setError(dbErr.message) }
-      else { setProducts(prev => prev.map(p => p.id === editingId ? data : p)); closeForm() }
-    } else {
-      // INSERT
-      const { data, error: dbErr } = await supabase.from('products')
-        .insert({ ...payload, store_id: storeId }).select('*, categories(name)').single()
-      if (dbErr) {
-        if (dbErr.message.includes('FREE_PLAN_PRODUCT_LIMIT'))
-          setError(t.freeLimitWarning + ' ' + t.contactUpgrade)
-        else setError(dbErr.message)
-        if (image_url && !existingImageUrl) {
-          const path = image_url.split('/product-images/')[1]
-          await supabase.storage.from('product-images').remove([path])
-        }
-      } else { setProducts(p => [...p, data]); closeForm() }
+    if (upErr) { setQrisMsg('❌ Upload failed: ' + upErr.message); setQrisLoading(false); return }
+
+    const { data: urlData } = supabase.storage.from('qris-images').getPublicUrl(fileName)
+    const url = urlData.publicUrl
+
+    const { error: dbErr } = await supabase.from('stores')
+      .update({ qris_image_url: url }).eq('id', storeId)
+
+    if (dbErr) { setQrisMsg('❌ ' + dbErr.message) }
+    else {
+      setStore(s => ({ ...s, qris_image_url: url }))
+      setQrisFile(null)
+      setQrisPreview(null)
+      setQrisMsg('✅ QRIS image saved! It will show on the POS when QRIS is selected.')
     }
-    setSaving(false)
+    setQrisLoading(false)
   }
 
-  async function deleteProduct(id, imageUrl) {
-    if (!window.confirm('Remove this product?')) return
-    await supabase.from('products').update({ is_active: false }).eq('id', id)
-    if (imageUrl) {
-      const path = imageUrl.split('/product-images/')[1]
-      if (path) await supabase.storage.from('product-images').remove([path])
+  async function removeQris() {
+    if (!window.confirm('Remove your QRIS image?')) return
+    setQrisLoading(true)
+    if (store.qris_image_url) {
+      const path = store.qris_image_url.split('/qris-images/')[1]
+      if (path) await supabase.storage.from('qris-images').remove([path])
     }
-    setProducts(p => p.filter(x => x.id !== id))
+    await supabase.from('stores').update({ qris_image_url: null }).eq('id', storeId)
+    setStore(s => ({ ...s, qris_image_url: '' }))
+    setQrisPreview(null)
+    setQrisFile(null)
+    setQrisMsg('QRIS image removed.')
+    setQrisLoading(false)
   }
 
-  // ── Shared image upload UI ──
-  const ImageUpload = () => (
-    <div className="col-span-2">
-      <label className="block text-xs text-gray-400 uppercase tracking-widest mb-2">
-        {t.productImage} <span className="text-gray-600 normal-case">{t.imageHint}</span>
-      </label>
-      <div className="flex items-start gap-4">
-        <div onClick={() => !imageLoading && fileInputRef.current?.click()}
-          className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl border-2 border-dashed border-gray-700 hover:border-violet-500 flex items-center justify-center cursor-pointer overflow-hidden transition-colors flex-shrink-0 bg-gray-800">
-          {imageLoading ? <span className="text-xs text-gray-400">...</span>
-            : (imagePreview || existingImageUrl)
-              ? <img src={imagePreview || existingImageUrl} alt="preview" className="w-full h-full object-cover" />
-              : <div className="text-center"><div className="text-2xl mb-1">📷</div><div className="text-xs text-gray-500">{t.clickToUpload}</div></div>
-          }
-        </div>
-        <div className="flex flex-col gap-2 pt-1">
-          <button type="button" onClick={() => fileInputRef.current?.click()} disabled={imageLoading}
-            className="bg-gray-800 hover:bg-gray-700 border border-gray-700 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50">
-            {(imagePreview || existingImageUrl) ? t.changeImage : t.selectImage}
-          </button>
-          {(imagePreview || existingImageUrl) && (
-            <button type="button" onClick={() => { setImageFile(null); setImagePreview(null); setExistingImageUrl(null) }}
-              className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
-              {t.remove}
-            </button>
-          )}
-          {imageFile && <span className="text-xs text-green-500">✓ {(imageFile.size / 1024).toFixed(0)} KB</span>}
-        </div>
-      </div>
-      <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
-    </div>
-  )
+  const currentQrisImage = qrisPreview || store.qris_image_url || null
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
       <div className="bg-gray-900 border-b border-gray-800 px-4 py-3 flex items-center gap-3">
         <Link to="/dashboard" className="text-gray-400 hover:text-white text-sm flex-shrink-0">{t.back}</Link>
-        <h1 className="font-bold truncate">{t.products}</h1>
-        <span className="text-xs text-gray-500 flex-shrink-0">
-          {activeCount}/{plan === 'free' ? FREE_LIMIT : '∞'}
-          {plan === 'free' && <span className="ml-1.5 px-1.5 py-0.5 bg-amber-500/20 text-amber-400 rounded text-xs font-bold">FREE</span>}
-          {plan === 'pro'  && <span className="ml-1.5 px-1.5 py-0.5 bg-violet-500/20 text-violet-400 rounded text-xs font-bold">PRO</span>}
-        </span>
-        <div className="ml-auto flex items-center gap-2 flex-shrink-0">
-          <LangToggle />
-          <button onClick={openAddForm} disabled={atLimit}
-            className="bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed px-3 py-2 rounded-lg text-xs sm:text-sm font-bold transition-colors whitespace-nowrap">
-            {t.addProduct}
-          </button>
-        </div>
+        <h1 className="font-bold">{t.settings}</h1>
+        <div className="ml-auto"><LangToggle /></div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-4 py-5">
-        {atLimit && (
-          <div className="mb-4 bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-xl p-4 text-sm">
-            <strong>{t.freeLimitWarning}</strong> {t.contactUpgrade}
+      <div className="max-w-2xl mx-auto px-4 py-5 space-y-6">
+
+        {/* Store Code */}
+        {store.store_code && (
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 sm:p-6">
+            <h2 className="font-bold text-lg mb-1"># {t.storeCode}</h2>
+            <p className="text-gray-400 text-sm mb-3">{t.storeCodeDesc}</p>
+            <div className="bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 flex items-center gap-3">
+              <span className="font-mono font-bold text-2xl text-violet-400 tracking-widest">
+                {store.store_code}
+              </span>
+              <span className="text-xs text-gray-500 ml-auto">read-only</span>
+            </div>
           </div>
         )}
 
-        {/* Add / Edit form */}
-        {showForm && (
-          <form onSubmit={saveProduct} className="bg-gray-900 border border-gray-800 rounded-xl p-4 sm:p-6 mb-5">
-            <h2 className="font-bold text-lg mb-4">{editingId ? t.editProduct : t.newProduct}</h2>
-            {error && <div className="mb-4 bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg p-3 text-sm">{error}</div>}
-
-            <div className="grid grid-cols-2 gap-3 sm:gap-4">
-              <ImageUpload />
-
-              {[
-                { label: t.productName, field: 'name',  type: 'text',   required: true,  placeholder: 'e.g. Caramel Latte', span: 2 },
-                { label: t.emojiIcon,   field: 'emoji', type: 'text',   required: false, placeholder: '☕', span: 1 },
-                { label: t.skuBarcode,  field: 'sku',   type: 'text',   required: false, placeholder: 'BEV001', span: 1 },
-                { label: t.price,       field: 'price', type: 'number', required: true,  placeholder: '25000', span: 1 },
-                { label: t.stock,       field: 'stock', type: 'number', required: true,  placeholder: '50', span: 1 },
-              ].map(({ label, field, type, required, placeholder, span }) => (
-                <div key={field} className={span === 2 ? 'col-span-2' : ''}>
-                  <label className="block text-xs text-gray-400 uppercase tracking-widest mb-1.5">{label}</label>
-                  <input type={type} required={required} placeholder={placeholder}
-                    value={form[field]} onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 sm:px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-violet-500 transition-colors text-sm" />
-                </div>
-              ))}
-
-              <div>
-                <label className="block text-xs text-gray-400 uppercase tracking-widest mb-1.5">{t.category}</label>
-                <select value={form.category_id} onChange={e => setForm(f => ({ ...f, category_id: e.target.value }))}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 sm:px-4 py-2.5 text-white focus:outline-none focus:border-violet-500 text-sm">
-                  <option value="">{t.noCategory}</option>
-                  {categories.map(c => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
-                </select>
+        {/* Store Details */}
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 sm:p-6">
+          <h2 className="font-bold text-lg mb-1">{t.storeDetails}</h2>
+          <p className="text-gray-400 text-sm mb-4">{t.storeDetailsDesc}</p>
+          <form onSubmit={saveStore} className="space-y-4">
+            {[
+              { label: t.storeName,     field: 'name',           placeholder: 'Sunrise Café' },
+              { label: t.address,       field: 'address',        placeholder: 'Jl. Sudirman No.1, Jakarta' },
+              { label: t.phone,         field: 'phone',          placeholder: '0812-3456-7890' },
+              { label: t.instagram,     field: 'instagram',      placeholder: '@sunrisecafe' },
+              { label: t.receiptFooter, field: 'receipt_footer', placeholder: 'Terima kasih sudah berkunjung!' },
+            ].map(({ label, field, placeholder }) => (
+              <div key={field}>
+                <label className="block text-xs text-gray-400 uppercase tracking-widest mb-1.5">{label}</label>
+                <input type="text" placeholder={placeholder} value={store[field]}
+                  onChange={e => setStore(s => ({ ...s, [field]: e.target.value }))}
+                  className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white text-base placeholder-gray-600 focus:outline-none focus:border-violet-500 transition-colors" />
               </div>
-            </div>
-
-            <div className="flex gap-3 mt-4">
-              <button type="submit" disabled={saving || imageLoading}
-                className="bg-violet-600 hover:bg-violet-500 disabled:opacity-50 px-5 py-2.5 rounded-xl font-bold transition-colors text-sm">
-                {saving ? t.saving : editingId ? t.saveChanges : t.saving.replace('...', '') + 'Save'}
-              </button>
-              <button type="button" onClick={closeForm}
-                className="bg-gray-800 hover:bg-gray-700 px-5 py-2.5 rounded-xl text-sm transition-colors">
-                {t.cancel}
-              </button>
-            </div>
+            ))}
+            {saveMsg && (
+              <div className={`text-sm p-3 rounded-lg ${saveMsg.startsWith('✅') ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
+                {saveMsg}
+              </div>
+            )}
+            <button type="submit" disabled={saving}
+              className="w-full sm:w-auto bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-bold px-6 py-3 rounded-xl transition-colors">
+              {saving ? t.saving : t.saveStoreDetails}
+            </button>
           </form>
-        )}
-
-        {/* Products — card grid on mobile, table on desktop */}
-        <div className="hidden sm:block bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-800">
-                {['', t.productName, t.category, t.price, t.stock, t.status, ''].map((h, i) => (
-                  <th key={i} className="text-left px-4 py-3 text-xs text-gray-400 uppercase tracking-widest font-normal">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {products.map(p => (
-                <tr key={p.id} className="border-b border-gray-800 last:border-0 hover:bg-gray-800/50">
-                  <td className="px-4 py-3">
-                    {p.image_url
-                      ? <img src={p.image_url} alt={p.name} className="w-10 h-10 rounded-lg object-cover border border-gray-700" />
-                      : <div className="w-10 h-10 rounded-lg bg-gray-800 border border-gray-700 flex items-center justify-center text-xl">{p.emoji}</div>
-                    }
-                  </td>
-                  <td className="px-4 py-3 text-sm font-medium">{p.name}</td>
-                  <td className="px-4 py-3 text-sm text-gray-400">{p.categories?.name || '—'}</td>
-                  <td className="px-4 py-3 text-sm font-bold">Rp {Math.round(p.price).toLocaleString('id-ID')}</td>
-                  <td className="px-4 py-3 text-sm">
-                    <span className={`px-2 py-0.5 rounded-md text-xs font-bold ${
-                      p.stock === 0 ? 'bg-red-500/20 text-red-400'
-                      : p.stock <= p.low_stock_threshold ? 'bg-amber-500/20 text-amber-400'
-                      : 'bg-green-500/20 text-green-400'}`}>
-                      {p.stock === 0 ? t.outOfStockLabel : `${p.stock} ${t.units}`}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="px-2 py-0.5 rounded-md text-xs font-bold bg-green-500/20 text-green-400">{t.active}</span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex gap-2">
-                      <button onClick={() => openEditForm(p)}
-                        className="text-xs text-blue-400 hover:text-blue-300 bg-blue-500/10 hover:bg-blue-500/20 px-3 py-1 rounded-lg transition-colors">
-                        {t.edit}
-                      </button>
-                      <button onClick={() => deleteProduct(p.id, p.image_url)}
-                        className="text-xs text-red-400 hover:text-red-300 bg-red-500/10 hover:bg-red-500/20 px-3 py-1 rounded-lg transition-colors">
-                        {t.remove}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {products.length === 0 && (
-                <tr><td colSpan={7} className="px-4 py-10 text-center text-gray-500 text-sm">No products yet. Add your first one above.</td></tr>
-              )}
-            </tbody>
-          </table>
         </div>
 
-        {/* Mobile card list */}
-        <div className="sm:hidden space-y-3">
-          {products.map(p => (
-            <div key={p.id} className="bg-gray-900 border border-gray-800 rounded-xl p-3 flex gap-3">
-              {p.image_url
-                ? <img src={p.image_url} alt={p.name} className="w-14 h-14 rounded-xl object-cover flex-shrink-0" />
-                : <div className="w-14 h-14 rounded-xl bg-gray-800 flex items-center justify-center text-2xl flex-shrink-0">{p.emoji}</div>
-              }
-              <div className="flex-1 min-w-0">
-                <div className="font-bold text-sm truncate">{p.name}</div>
-                <div className="text-violet-400 text-sm font-bold">Rp {Math.round(p.price).toLocaleString('id-ID')}</div>
-                <div className={`text-xs mt-0.5 ${p.stock === 0 ? 'text-red-400' : p.stock <= p.low_stock_threshold ? 'text-amber-400' : 'text-gray-400'}`}>
-                  {p.stock === 0 ? t.outOfStockLabel : `${p.stock} ${t.units}`}
+        {/* QRIS Image */}
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 sm:p-6">
+          <h2 className="font-bold text-lg mb-1">📱 QRIS Payment Image</h2>
+          <p className="text-gray-400 text-sm mb-4">
+            Upload your store's QRIS image from your bank or e-wallet (GoPay, OVO, Dana, BCA, etc.).
+            It will be displayed full-screen on the POS when a cashier selects QRIS payment,
+            so customers can scan it directly from the screen.
+          </p>
+
+          <div className="flex flex-col sm:flex-row gap-4 items-start">
+            {/* Preview */}
+            <div
+              onClick={() => !qrisLoading && qrisInputRef.current?.click()}
+              className={`w-full sm:w-48 h-48 rounded-xl border-2 border-dashed flex items-center justify-center overflow-hidden transition-colors cursor-pointer flex-shrink-0 ${
+                currentQrisImage
+                  ? 'border-violet-500 bg-gray-800'
+                  : 'border-gray-700 hover:border-violet-500 bg-gray-800'
+              }`}
+            >
+              {currentQrisImage ? (
+                <img src={currentQrisImage} alt="QRIS" className="w-full h-full object-contain p-2" />
+              ) : (
+                <div className="text-center px-4">
+                  <div className="text-4xl mb-2">📱</div>
+                  <div className="text-xs text-gray-500">Click to upload your QRIS image</div>
                 </div>
-              </div>
-              <div className="flex flex-col gap-1.5 flex-shrink-0">
-                <button onClick={() => openEditForm(p)}
-                  className="text-xs text-blue-400 bg-blue-500/10 px-2.5 py-1 rounded-lg">
-                  {t.edit}
-                </button>
-                <button onClick={() => deleteProduct(p.id, p.image_url)}
-                  className="text-xs text-red-400 bg-red-500/10 px-2.5 py-1 rounded-lg">
-                  {t.remove}
-                </button>
-              </div>
+              )}
             </div>
-          ))}
-          {products.length === 0 && (
-            <div className="text-center text-gray-500 py-12 text-sm">No products yet.</div>
-          )}
+
+            <div className="flex flex-col gap-3 flex-1">
+              <div className="text-sm text-gray-400">
+                {store.qris_image_url
+                  ? '✅ QRIS image is set and active on your POS.'
+                  : '⚠️ No QRIS image uploaded yet. Add one so cashiers can show it during payment.'}
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => qrisInputRef.current?.click()}
+                  disabled={qrisLoading}
+                  className="bg-violet-600 hover:bg-violet-500 disabled:opacity-50 px-4 py-2 rounded-xl text-sm font-bold transition-colors">
+                  {store.qris_image_url ? 'Replace Image' : 'Upload QRIS Image'}
+                </button>
+                {(qrisFile || store.qris_image_url) && (
+                  <>
+                    {qrisFile && (
+                      <button
+                        type="button"
+                        onClick={saveQris}
+                        disabled={qrisLoading}
+                        className="bg-green-700 hover:bg-green-600 disabled:opacity-50 px-4 py-2 rounded-xl text-sm font-bold transition-colors">
+                        {qrisLoading ? 'Saving...' : '✓ Save QRIS Image'}
+                      </button>
+                    )}
+                    {store.qris_image_url && !qrisFile && (
+                      <button
+                        type="button"
+                        onClick={removeQris}
+                        disabled={qrisLoading}
+                        className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 px-4 py-2 rounded-xl text-sm font-bold transition-colors">
+                        Remove
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {qrisMsg && (
+                <div className={`text-sm p-3 rounded-lg ${
+                  qrisMsg.startsWith('✅') ? 'bg-green-500/10 text-green-400'
+                  : qrisMsg.startsWith('❌') ? 'bg-red-500/10 text-red-400'
+                  : 'bg-gray-800 text-gray-400'
+                }`}>
+                  {qrisMsg}
+                </div>
+              )}
+
+              <p className="text-xs text-gray-600">
+                Supported formats: JPG, PNG, WEBP. Recommended: use the official QRIS image your bank provided.
+              </p>
+            </div>
+          </div>
+
+          <input
+            ref={qrisInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleQrisFile}
+            className="hidden"
+          />
         </div>
+
+        {/* Change Password */}
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 sm:p-6">
+          <h2 className="font-bold text-lg mb-1">{t.changePassword}</h2>
+          <p className="text-gray-400 text-sm mb-4">{t.changePasswordDesc}</p>
+          <form onSubmit={changePassword} className="space-y-4">
+            {[
+              { label: t.currentPassword,    field: 'current', placeholder: '••••••••' },
+              { label: t.newPassword,        field: 'next',    placeholder: t.minPassword },
+              { label: t.confirmNewPassword, field: 'confirm', placeholder: t.minPassword },
+            ].map(({ label, field, placeholder }) => (
+              <div key={field}>
+                <label className="block text-xs text-gray-400 uppercase tracking-widest mb-1.5">{label}</label>
+                <input type="password" placeholder={placeholder}
+                  value={pwForm[field]}
+                  onChange={e => setPwForm(f => ({ ...f, [field]: e.target.value }))}
+                  className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white text-base placeholder-gray-600 focus:outline-none focus:border-violet-500 transition-colors" />
+              </div>
+            ))}
+            {pwError && <div className="bg-red-500/10 text-red-400 text-sm p-3 rounded-lg">{pwError}</div>}
+            {pwMsg   && <div className="bg-green-500/10 text-green-400 text-sm p-3 rounded-lg">{pwMsg}</div>}
+            <button type="submit" disabled={pwLoad}
+              className="w-full sm:w-auto bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-bold px-6 py-3 rounded-xl transition-colors">
+              {pwLoad ? t.changingPassword : t.changePasswordBtn}
+            </button>
+          </form>
+        </div>
+
       </div>
     </div>
   )
